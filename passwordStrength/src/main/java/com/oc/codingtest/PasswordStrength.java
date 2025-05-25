@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
+import static java.lang.Math.abs;
+
 public class PasswordStrength {
 
   private static final Logger log = LoggerFactory.getLogger(PasswordStrength.class);
@@ -63,6 +65,62 @@ public class PasswordStrength {
    * @return
    */
   public int getMaxSequenceLen(String password) {
-    return 0;
+    String normalisedPassword = password.toLowerCase();
+
+    return normalisedPassword
+        .codePoints()
+        .collect(
+            HashMap::new,
+            (HashMap<String, Integer> acc, int c) -> {
+              // Non-numeric or alphabetic characters break a sequence
+              boolean isCountable = (Character.isAlphabetic(c) || Character.isDigit(c));
+
+              /* If the absolute distance from the last is 1,
+               * then we're either starting or continuing a sequence.
+               * */
+              if (isCountable) {
+                // Get the last character or default to the current one
+                int lastChar = acc.getOrDefault("lastChar", c);
+                // Get the difference between the two
+                int distance = lastChar - c;
+
+                if (abs(distance) == 1) {
+                  int current;
+                /*
+                 If the sequence has maintained its current direction, it's a continuation.
+                 If not, it's a new sequence.
+                */
+                  if (distance == acc.get("direction")) {
+                    // Increment the current sequence length.
+                    current = acc.merge("current", 1, Integer::sum);
+                  } else {
+                    acc.put("current", 2);
+                    current = 2;
+                  }
+                  // Set the current sequence direction (either -1 or 1)
+                  acc.put("direction", distance);
+                  // Update the maximum sequence length
+                  acc.merge("max", current, Integer::max);
+                } else {
+                  // We've broken the sequence; reset the current length and direction
+                  acc.put("current", 1);
+                  acc.put("direction", 0);
+                }
+                // Store the current character for the next comparison
+                acc.put("lastChar", c);
+              } else {
+                // If the current character is not countable, reset comparisons
+                acc.remove("lastChar");
+                acc.put("current", 1);
+                acc.put("direction", 0);
+              }
+            },
+            (a, b) -> {
+              // Merge two accumulators by choosing the maximum sequence length
+              int bMax = b.getOrDefault("max", 0);
+              a.merge("max", bMax, Integer::max);
+            }
+        )
+        .getOrDefault("max", 0);
   }
 }
