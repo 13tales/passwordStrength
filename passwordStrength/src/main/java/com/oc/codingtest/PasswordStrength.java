@@ -146,8 +146,6 @@ public class PasswordStrength {
    * @return
    */
   public int getMaxSequenceLen(String password) {
-
-
     String normalisedPassword = password.toLowerCase();
 
     return normalisedPassword
@@ -159,6 +157,5 @@ public class PasswordStrength {
               a.maxLen = Integer.max(a.maxLen, b.maxLen);
             }
         ).maxLen;
-
   }
 }
