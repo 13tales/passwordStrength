@@ -5,8 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-import static java.util.stream.Collectors.*;
-
 public class PasswordStrength {
 
   private static final Logger log = LoggerFactory.getLogger(PasswordStrength.class);
@@ -15,21 +13,38 @@ public class PasswordStrength {
     // This method accepts a password (String) and calculates two password strength parameters:
     // Repetition count and Max Sequence length
     return getMaxRepetitionCount(password) <= maxAllowedRepetitionCount
-             && getMaxSequenceLen(password) <= maxAllowedSequenceLength;
+        && getMaxSequenceLen(password) <= maxAllowedSequenceLength;
   }
 
   /**
    * Repetition count - the number of occurrences of the *most repeated* character within the password
-   *   eg1: "Melbourne" has a repetition count of 2 - for the 2 non-consecutive "e" characters.
-   *   eg2: "passwords" has a repetition count of 3 - for the 3 "s" characters
-   *   eg3: "lucky" has a repetition count of 1 - each character appears only once.
-   *   eg4: "Elephant" has a repetition count of 1 - as the two "e" characters have different cases (ie one "E", one "e")
+   * eg1: "Melbourne" has a repetition count of 2 - for the 2 non-consecutive "e" characters.
+   * eg2: "passwords" has a repetition count of 3 - for the 3 "s" characters
+   * eg3: "lucky" has a repetition count of 1 - each character appears only once.
+   * eg4: "Elephant" has a repetition count of 1 - as the two "e" characters have different cases (ie one "E", one "e")
    * The repetition count should be case-sensitive.
+   *
    * @param password
    * @return
    */
   public int getMaxRepetitionCount(String password) {
-    return 1;
+    // Generate a frequency map of the characters/codepoints in the password string using Java streams.
+    HashMap<Integer, Integer> frequencyMap = password
+        .chars()
+        .collect(
+            HashMap::new,
+            (HashMap<Integer, Integer> acc, int c) -> {
+              acc.merge(c, 1, Integer::sum);
+            },
+            (HashMap<Integer, Integer> a, HashMap<Integer, Integer> b) ->
+                b.forEach((k, v) -> a.merge(k, v, Integer::sum))
+        );
+
+    /**
+     * Get a stream of the frequency counts and use .max to find the highest count.
+     * `.orElse` is necessary because `.max` returns an optional value.
+     */
+    return frequencyMap.values().stream().max(Integer::compareTo).orElse(0);
   }
 
   /**
@@ -43,6 +58,7 @@ public class PasswordStrength {
    * eg5: "ABC_DEF" would have a sequence length of 3, because the special character breaks the progression
    * Check the supplied password.  Return true if the repetition count and sequence length are below or equal to the
    * specified maximum.  Otherwise, return false.
+   *
    * @param password
    * @return
    */
