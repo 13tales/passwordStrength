@@ -7,6 +7,87 @@ import java.util.*;
 
 import static java.lang.Math.abs;
 
+class SequenceState {
+  enum SeqDirection {
+    ASC,
+    DESC,
+    NONE
+  }
+
+  public SeqDirection direction = SeqDirection.NONE;
+  public Optional<Integer> lastChar = Optional.empty();
+  public int maxLen = 0;
+  public int currentLen = 0;
+
+  public void nextChar(int c) {
+    if (isCountable(c)) {
+      // Get the last character or default to the current one
+      if (getDistance(c).isEmpty()) {
+        this.currentLen = 1;
+      } else {
+        if (this.isContinuing(c)) {
+          this.continueSeq(c);
+        } else {
+          this.reset();
+        }
+      }
+
+      this.lastChar = Optional.of(c);
+    } else {
+      this.handleNonCountable();
+    }
+
+    this.maxLen = Integer.max(this.currentLen, this.maxLen);
+  }
+
+  private Optional<Integer> getDistance(int c) {
+    return this.lastChar.map(last -> last - c);
+  }
+
+  private SeqDirection getDirection(int c) {
+    Optional<Integer> distance = getDistance(c);
+
+    if (distance.isEmpty() || distance.get() == 0) {
+      return SeqDirection.NONE;
+    } else if (distance.get() > 0) {
+      return SeqDirection.DESC;
+    } else {
+      return SeqDirection.ASC;
+    }
+  }
+
+  private boolean isContinuing(int c) {
+    Optional<Integer> distance = getDistance(c);
+    return distance.isPresent() && abs(distance.get()) == 1;
+  }
+
+  private static boolean isCountable(int c) {
+    return Character.isAlphabetic(c) || Character.isDigit(c);
+  }
+
+  private void continueSeq(int c) {
+    SeqDirection currentDirection = getDirection(c);
+    if (this.direction == SeqDirection.NONE || currentDirection == this.direction) {
+      this.currentLen += 1;
+    } else {
+      this.currentLen = 2;
+    }
+
+    this.direction = currentDirection;
+  }
+
+  private void reset() {
+    this.currentLen = 1;
+    this.direction = SeqDirection.NONE;
+  }
+
+  private void handleNonCountable() {
+    this.lastChar = Optional.empty();
+    this.currentLen = 0;
+    this.direction = SeqDirection.NONE;
+  }
+}
+
 public class PasswordStrength {
 
   private static final Logger log = LoggerFactory.getLogger(PasswordStrength.class);
@@ -65,62 +146,19 @@ public class PasswordStrength {
    * @return
    */
   public int getMaxSequenceLen(String password) {
+
+
     String normalisedPassword = password.toLowerCase();
 
     return normalisedPassword
-        .codePoints()
+        .chars()
         .collect(
-            HashMap::new,
-            (HashMap<String, Integer> acc, int c) -> {
-              // Non-numeric or alphabetic characters break a sequence
-              boolean isCountable = (Character.isAlphabetic(c) || Character.isDigit(c));
-
-              /* If the absolute distance from the last is 1,
-               * then we're either starting or continuing a sequence.
-               * */
-              if (isCountable) {
-                // Get the last character or default to the current one
-                int lastChar = acc.getOrDefault("lastChar", c);
-                // Get the difference between the two
-                int distance = lastChar - c;
-
-                if (abs(distance) == 1) {
-                  int current;
-                /*
-                 If the sequence has maintained its current direction, it's a continuation.
-                 If not, it's a new sequence.
-                */
-                  if (distance == acc.get("direction")) {
-                    // Increment the current sequence length.
-                    current = acc.merge("current", 1, Integer::sum);
-                  } else {
-                    acc.put("current", 2);
-                    current = 2;
-                  }
-                  // Set the current sequence direction (either -1 or 1)
-                  acc.put("direction", distance);
-                  // Update the maximum sequence length
-                  acc.merge("max", current, Integer::max);
-                } else {
-                  // We've broken the sequence; reset the current length and direction
-                  acc.put("current", 1);
-                  acc.put("direction", 0);
-                }
-                // Store the current character for the next comparison
-                acc.put("lastChar", c);
-              } else {
-                // If the current character is not countable, reset comparisons
-                acc.remove("lastChar");
-                acc.put("current", 1);
-                acc.put("direction", 0);
-              }
-            },
+            SequenceState::new,
+            SequenceState::nextChar,
             (a, b) -> {
-              // Merge two accumulators by choosing the maximum sequence length
-              int bMax = b.getOrDefault("max", 0);
-              a.merge("max", bMax, Integer::max);
+              a.maxLen = Integer.max(a.maxLen, b.maxLen);
             }
-        )
-        .getOrDefault("max", 0);
+        ).maxLen;
+
   }
 }
